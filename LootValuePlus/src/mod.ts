@@ -5,6 +5,7 @@ import { ItemHelper } from "@spt/helpers/ItemHelper";
 import { IRagfairOffer } from "@spt/models/eft/ragfair/IRagfairOffer";
 import { TradeHelper } from "@spt/helpers/TradeHelper";
 import { ProfileHelper } from "@spt/helpers/ProfileHelper";
+import { RagfairSellHelper } from "@spt/helpers/RagfairSellHelper";
 import { IProcessSellTradeRequestData } from "@spt/models/eft/trade/IProcessSellTradeRequestData";
 import { SaveServer } from "@spt/servers/SaveServer";
 
@@ -26,6 +27,7 @@ class Mod implements IPreSptLoadMod
   private saveServer: SaveServer;
   private priceService: RagfairPriceService;
   private ragfairConfig: IRagfairConfig;
+  private ragfairSellHelper: RagfairSellHelper;
 
   private logger: ILogger;
 	
@@ -44,6 +46,7 @@ class Mod implements IPreSptLoadMod
     this.priceService = container.resolve<RagfairPriceService>("RagfairPriceService");
     const config = container.resolve<ConfigServer>("ConfigServer");
     this.ragfairConfig = config.getConfig(ConfigTypes.RAGFAIR);
+    this.ragfairSellHelper = container.resolve<RagfairSellHelper>("RagfairSellHelper")
 
     // Hook up a new static route
     staticRouterModService.registerStaticRouter(
@@ -99,8 +102,12 @@ class Mod implements IPreSptLoadMod
     const itemPriceModifer = this.ragfairConfig.dynamic.itemPriceMultiplier[templateId];
     //console.log(`Item price modifier: ${itemPriceModifer || "No modifier in place"}`);
 
+    // console.log(`Item sell chance before modifier w/ 1.0 quality: ${this.ragfairSellHelper.calculateSellChance(fleaPriceForItem, fleaPriceForItem, 1.0)}`);
+
     if (itemPriceModifer)
       fleaPriceForItem *= itemPriceModifer;
+
+    // console.log(`Item sell chance after modifier w/ 1.0 quality : ${this.ragfairSellHelper.calculateSellChance(fleaPriceForItem, fleaPriceForItem, 1.0)}`);
 
     return fleaPriceForItem;
   }
