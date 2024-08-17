@@ -80,8 +80,13 @@ class Mod implements IPreSptLoadMod {
 
         // https://dev.sp-tarkov.com/SPT/Server/src/tag/3.9.4/project/src/services/RagfairTaxService.ts#L104
         // CHANGE THIS FOR ALL VERSION RELEASES
-        const calculateItemWorth = (item: Item, itemTemplate: ITemplateItem, itemCount: number, pmcData: IPmcData, isRootItem?: boolean) => {
+        const calculateItemWorth = (item: Item, itemTemplate: ITemplateItem, itemCount: number, pmcData: IPmcData, isRootItem: boolean = true) => {
           let worth = this.priceService.getFleaPriceForItem(item._tpl);
+
+          // this fixes the items with undefined `upd`
+          if (item.upd === undefined) {
+            item.upd = {};
+          }
 
           // In client, all item slots are traversed and any items contained within have their values added
           if (isRootItem) {
@@ -93,12 +98,10 @@ class Mod implements IPreSptLoadMod {
                   continue;
                 }
 
-                // PATCH TO FIX ERRORS
-                const stackCount = child.upd?.StackObjectsCount || 1;
                 worth += calculateItemWorth(
                   child,
                   this.itemHelper.getItem(child._tpl)[1],
-                  stackCount,
+                  child.upd?.StackObjectsCount ?? 1,
                   pmcData,
                   false,
                 );
