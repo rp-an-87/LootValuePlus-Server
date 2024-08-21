@@ -1,25 +1,21 @@
 /* eslint-disable @typescript-eslint/naming-convention */
-import { DependencyContainer } from "tsyringe";
-import { RagfairOfferService } from "@spt/services/RagfairOfferService";
 import { ItemHelper } from "@spt/helpers/ItemHelper";
-import { IRagfairOffer } from "@spt/models/eft/ragfair/IRagfairOffer";
-import { Item } from "@spt/models/eft/common/tables/IItem";
-import { TradeHelper } from "@spt/helpers/TradeHelper";
 import { ProfileHelper } from "@spt/helpers/ProfileHelper";
-import { RagfairTaxService } from "@spt/services/RagfairTaxService";
+import { TradeHelper } from "@spt/helpers/TradeHelper";
+import { IRagfairOffer } from "@spt/models/eft/ragfair/IRagfairOffer";
 import { IProcessSellTradeRequestData } from "@spt/models/eft/trade/IProcessSellTradeRequestData";
 import { SaveServer } from "@spt/servers/SaveServer";
+import { RagfairOfferService } from "@spt/services/RagfairOfferService";
+import { DependencyContainer } from "tsyringe";
 
 import type { IPreSptLoadMod } from "@spt/models/external/IPreSptLoadMod";
 import type { ILogger } from "@spt/models/spt/utils/ILogger";
 import type { StaticRouterModService } from "@spt/services/mod/staticRouter/StaticRouterModService";
 
-import { RagfairPriceService } from "@spt/services/RagfairPriceService";
-import { ConfigServer } from "@spt/servers/ConfigServer";
-import { IRagfairConfig } from "@spt/models/spt/config/IRagfairConfig";
 import { ConfigTypes } from "@spt/models/enums/ConfigTypes";
-import { ITemplateItem } from "@spt/models/eft/common/tables/ITemplateItem";
-import { IPmcData } from "@spt/models/eft/common/IPmcData";
+import { IRagfairConfig } from "@spt/models/spt/config/IRagfairConfig";
+import { ConfigServer } from "@spt/servers/ConfigServer";
+import { RagfairPriceService } from "@spt/services/RagfairPriceService";
 
 class Mod implements IPreSptLoadMod {
   private itemHelper: ItemHelper;
@@ -62,6 +58,16 @@ class Mod implements IPreSptLoadMod {
           }
         },
         {
+          url: "/LootValue/GetMultipleItemsSellingFleaPrice",
+          //info is the payload from client in json
+          //output is the response back to client
+          action: async (url, info, sessionID, output) => {
+            // this.logger.info(JSON.stringify(info));
+            const fleaMarketPrices = this.getMultipleItemsSellingFleaPrice([...info.templateIds]);
+            return JSON.stringify({ prices: [...fleaMarketPrices] });
+          }
+        },
+        {
           url: "/LootValue/SellItemToTrader",
           //info is the payload from client in json
           //output is the response back to client
@@ -74,6 +80,22 @@ class Mod implements IPreSptLoadMod {
       "custom-static-LootValuePlusRoutes"
     );
 
+  }
+
+
+  private getMultipleItemsSellingFleaPrice(templateIds: string[]): { templateId: string, price: number }[] {
+    return templateIds
+      .map(templateId => {
+        const avgPrice = this.getFleaSingleItemPriceForTemplate(templateId);
+        let actualPrice = 0;
+        if (avgPrice > 0) {
+          actualPrice = Math.floor(avgPrice);
+        }
+        return {
+          templateId,
+          price: actualPrice
+        };
+      });
   }
 
 
