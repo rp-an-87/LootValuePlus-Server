@@ -1,9 +1,9 @@
 {
     "compilerOptions": {
         "allowJs": true,
-        "module": "CommonJS",
-        "target": "es2020",
-        "moduleResolution": "node",
+        "module": "NodeNext",
+        "target": "ES2022",
+        "moduleResolution": "NodeNext",
         "esModuleInterop": true,
         "downlevelIteration": true,
         "experimentalDecorators": true,
@@ -15,11 +15,5 @@
             "@spt/*": ["./types/*"]
         }
     },
-    "lib": [
-        "es2020"
-    ],
-    "include": [
-        "src/*",
-        "src/**/*"
-    ]
+    "exclude": ["node_modules", "dist", "tmp"]
 }

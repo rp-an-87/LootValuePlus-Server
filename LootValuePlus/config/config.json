@@ -1,0 +1,23 @@
+{
+    "flea": {
+        "disableBarters": true
+    },
+    "extracts": {
+        "chances": {
+            "enabled": true,
+            "locations": {
+                "bigmap": 100,
+                "interchange": 100,
+                "laboratory": 100,
+                "lighthouse": 100,
+                "shoreline": 100,
+                "tarkovstreets": 100,
+                "woods": 100
+            }
+        },
+        "coop": {
+            "enabled": true,
+            "amount": 1000
+        }
+    }
+}
