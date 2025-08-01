@@ -12,13 +12,16 @@ import type { IPreSptLoadMod } from "@spt/models/external/IPreSptLoadMod";
 import type { ILogger } from "@spt/models/spt/utils/ILogger";
 import type { StaticRouterModService } from "@spt/services/mod/staticRouter/StaticRouterModService";
 
+import { IExit } from "@spt/models/eft/common/ILocationBase";
 import { ConfigTypes } from "@spt/models/enums/ConfigTypes";
+import { MemberCategory } from "@spt/models/enums/MemberCategory";
+import { IPostDBLoadMod } from "@spt/models/external/IPostDBLoadMod";
 import { IRagfairConfig } from "@spt/models/spt/config/IRagfairConfig";
 import { ConfigServer } from "@spt/servers/ConfigServer";
-import { RagfairPriceService } from "@spt/services/RagfairPriceService";
-import { IPostDBLoadMod } from "@spt/models/external/IPostDBLoadMod";
 import { DatabaseServer } from "@spt/servers/DatabaseServer";
-import { IExit, ILocationBase } from "@spt/models/eft/common/ILocationBase";
+import { RagfairPriceService } from "@spt/services/RagfairPriceService";
+import { IPostSptLoadMod } from "@spt/models/external/IPostSptLoadMod";
+import { PostSptModLoader } from "@spt/loaders/PostSptModLoader";
 
 class Mod implements IPreSptLoadMod, IPostDBLoadMod {
   private itemHelper: ItemHelper;
@@ -79,6 +82,23 @@ class Mod implements IPreSptLoadMod, IPostDBLoadMod {
             // this.logger.info(JSON.stringify(info));
             try {
               const fleaMarketPrices = this.getMultipleItemsSellingFleaPrice([...info.templateIds]);
+              return JSON.stringify({ prices: [...fleaMarketPrices] });
+            } catch (error) {
+              return null;
+            }
+          }
+        },
+        {
+          url: "/LootValue/GetAllItemSellingFleaPrice",
+          //info is the payload from client in json
+          //output is the response back to client
+          action: async (url, info, sessionID, output) => {
+            // this.logger.info(JSON.stringify(info));
+            try {
+              // this.logger.warning("[LootValuePlus]: starting getting all items selling flea price");
+              const fleaMarketPrices = this.getAllItemsSellingFleaPrice();
+              // console.log(fleaMarketPrices);
+              // this.logger.warning("[LootValuePlus]: finishing getting all items selling flea price");
               return JSON.stringify({ prices: [...fleaMarketPrices] });
             } catch (error) {
               return null;
@@ -172,6 +192,63 @@ class Mod implements IPreSptLoadMod, IPostDBLoadMod {
   }
 
 
+  private getAllItemsSellingFleaPrice(): { templateId: string, price: number }[] {
+
+    const parsedOffers: { templateId: string, price: number }[] = [];
+    const offersByTemplate = this.getAllUserOffersByTemplateId();
+
+    for (const [templateId, offers] of offersByTemplate.entries()) {
+
+      const fleaItemPrice = this.priceService.getFleaPriceForItem(templateId);
+      const singleItemOffers = [...offers.filter(o => o.items.length == 1)];
+      const avgPriceOfItemInFleaMarket = this.getAvgPriceOfOffers(singleItemOffers);
+      const finalAvgItemPrice = this.normalizeStandardPriceWithOffersAverage(fleaItemPrice, avgPriceOfItemInFleaMarket);
+      parsedOffers.push({
+        templateId,
+        price: Math.floor(finalAvgItemPrice)
+      });
+
+    }
+
+    return parsedOffers;
+  }
+
+  private normalizeStandardPriceWithOffersAverage(fleaItemPrice: number, avgPriceOfItemInFleaMarket: number): number {
+    if (fleaItemPrice > avgPriceOfItemInFleaMarket * 1.1) {
+      const randomMultiplier = Math.floor(Math.random() * (1.1 - 0.9 + 1) + 0.9);
+      return avgPriceOfItemInFleaMarket * randomMultiplier;
+    }
+    return fleaItemPrice;
+  }
+
+
+  private getAvgPriceOfOffers(singleItemOffers: IRagfairOffer[]) {
+    const offerPrices = [...singleItemOffers.map(o => o.summaryCost)];
+    const min = Math.min(...offerPrices);
+    const max = Math.max(...offerPrices);
+    const avg = (max + min) / 2;
+    return avg;
+  }
+
+  private getAllUserOffersByTemplateId(): Map<string, IRagfairOffer[]> {
+    const offers = this.offerService.getOffers()
+      .filter(o => o.user.memberType != MemberCategory.TRADER) // keep only non trader offers.
+      .filter(o => o.items.length) // keep those with items just in case.
+      .filter(o => o.items[0]?._tpl.length); // keep those whose first item have a template id just in case.
+
+    const groupedByTemplateId = new Map();
+    for (const offer of offers) {
+      const templateId = offer.items[0]?._tpl;
+
+      if (!groupedByTemplateId.has(templateId)) {
+        groupedByTemplateId.set(templateId, []);
+      }
+
+      groupedByTemplateId.get(templateId).push(offer);
+    }
+    return groupedByTemplateId;
+  }
+
   private getMultipleItemsSellingFleaPrice(templateIds: string[]): { templateId: string, price: number }[] {
     return templateIds
       .map(templateId => {
@@ -233,10 +310,10 @@ class Mod implements IPreSptLoadMod, IPostDBLoadMod {
     // This offers a layer of security, there is some weird interaction if you use LiveFleaPrices where it will update the price of an item but the flea market will retain weird prices
     // Maybe the offers are generated before the price of the object is updated with the live flea? Who knows
     // In case there is such a desync, the offer will be automatically lowered to the avg price, randomly changing to anywhere between -10% and +10% of the avg
-    if (fleaPriceForItem > avg * 1.2) {
+    if (fleaPriceForItem > avg * 1.15) {
       const randomMultiplier = Math.floor(Math.random() * (1.1 - 0.9 + 1) + 0.9);
       fleaPriceForItem = avg * randomMultiplier;
-      this.logger.debug(`Current market price is more than 20% higher from the average of offers. Setting price to avg +-10%: ${fleaPriceForItem}`);
+      this.logger.debug(`Current market price is more than 15% higher from the average of offers. Setting price to avg +-10%: ${fleaPriceForItem}`);
     }
 
     const itemPriceModifer = this.ragfairConfig.dynamic.itemPriceMultiplier[templateId];
