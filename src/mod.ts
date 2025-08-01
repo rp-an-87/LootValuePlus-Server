@@ -20,8 +20,6 @@ import { IRagfairConfig } from "@spt/models/spt/config/IRagfairConfig";
 import { ConfigServer } from "@spt/servers/ConfigServer";
 import { DatabaseServer } from "@spt/servers/DatabaseServer";
 import { RagfairPriceService } from "@spt/services/RagfairPriceService";
-import { IPostSptLoadMod } from "@spt/models/external/IPostSptLoadMod";
-import { PostSptModLoader } from "@spt/loaders/PostSptModLoader";
 
 class Mod implements IPreSptLoadMod, IPostDBLoadMod {
   private itemHelper: ItemHelper;
@@ -202,10 +200,11 @@ class Mod implements IPreSptLoadMod, IPostDBLoadMod {
       const fleaItemPrice = this.priceService.getFleaPriceForItem(templateId);
       const singleItemOffers = [...offers.filter(o => o.items.length == 1)];
       const avgPriceOfItemInFleaMarket = this.getAvgPriceOfOffers(singleItemOffers);
-      const finalAvgItemPrice = this.normalizeStandardPriceWithOffersAverage(fleaItemPrice, avgPriceOfItemInFleaMarket);
+      const avgItemPrice = this.normalizeStandardPriceWithOffersAverage(fleaItemPrice, avgPriceOfItemInFleaMarket);
+      const finalItemPrice = this.applyMultiplierForItemPrice(templateId, avgItemPrice);
       parsedOffers.push({
         templateId,
-        price: Math.floor(finalAvgItemPrice)
+        price: Math.floor(finalItemPrice)
       });
 
     }
@@ -214,10 +213,14 @@ class Mod implements IPreSptLoadMod, IPostDBLoadMod {
   }
 
   private normalizeStandardPriceWithOffersAverage(fleaItemPrice: number, avgPriceOfItemInFleaMarket: number): number {
+    // This offers a layer of security, there is some weird interaction if you use LiveFleaPrices where it will update the price of an item but the flea market will retain weird prices
+    // Maybe the offers are generated before the price of the object is updated with the live flea? Who knows
+    // In case there is such a desync, the offer will be automatically lowered to the avg price, randomly changing to anywhere between -10% and +10% of the avg
     if (fleaItemPrice > avgPriceOfItemInFleaMarket * 1.1) {
       const randomMultiplier = Math.floor(Math.random() * (1.1 - 0.9 + 1) + 0.9);
       return avgPriceOfItemInFleaMarket * randomMultiplier;
     }
+
     return fleaItemPrice;
   }
 
@@ -301,30 +304,18 @@ class Mod implements IPreSptLoadMod, IPostDBLoadMod {
     // this.logger.debug(`Static flea price for templateId [${templateId}]: ${staticPriceForItem}`);
 
 
-    const offerPrices = [...offersByPlayers.map(o => o.summaryCost)];
-    const min = Math.min(...offerPrices);
-    const max = Math.max(...offerPrices);
-    const avg = (max + min) / 2;
-    this.logger.debug(`Current prices from players for [${templateId}]: Min: ${min} Max: ${max} Avg: ${avg}`);
-
-    // This offers a layer of security, there is some weird interaction if you use LiveFleaPrices where it will update the price of an item but the flea market will retain weird prices
-    // Maybe the offers are generated before the price of the object is updated with the live flea? Who knows
-    // In case there is such a desync, the offer will be automatically lowered to the avg price, randomly changing to anywhere between -10% and +10% of the avg
-    if (fleaPriceForItem > avg * 1.15) {
-      const randomMultiplier = Math.floor(Math.random() * (1.1 - 0.9 + 1) + 0.9);
-      fleaPriceForItem = avg * randomMultiplier;
-      this.logger.debug(`Current market price is more than 15% higher from the average of offers. Setting price to avg +-10%: ${fleaPriceForItem}`);
-    }
-
-    const itemPriceModifer = this.ragfairConfig.dynamic.itemPriceMultiplier[templateId];
-    this.logger.debug(`Modifier: ${itemPriceModifer}`)
-    if (itemPriceModifer) {
-      fleaPriceForItem *= itemPriceModifer;
-    }
-
+    const avgPriceOfItemInFleaMarket = this.getAvgPriceOfOffers(offersByPlayers);
+    this.logger.debug(`Current prices from players for [${templateId}]: Avg: ${avgPriceOfItemInFleaMarket}`);
+    fleaPriceForItem = this.normalizeStandardPriceWithOffersAverage(fleaPriceForItem, avgPriceOfItemInFleaMarket);
+    fleaPriceForItem = this.applyMultiplierForItemPrice(templateId, fleaPriceForItem);
 
 
     return fleaPriceForItem;
+  }
+
+  private applyMultiplierForItemPrice(templateId: string, price: number): number {
+    const itemPriceModifer = this.ragfairConfig.dynamic.itemPriceMultiplier[templateId];
+    return price * itemPriceModifer;
   }
 
   private sellItemToTrader(sessionId: string, itemId: string, traderId: string, price: number): boolean {
