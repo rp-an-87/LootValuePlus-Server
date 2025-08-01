@@ -197,14 +197,14 @@ class Mod implements IPreSptLoadMod, IPostDBLoadMod {
 
     for (const [templateId, offers] of offersByTemplate.entries()) {
 
-      const fleaItemPrice = this.priceService.getFleaPriceForItem(templateId);
+      let fleaItemPrice = this.priceService.getFleaPriceForItem(templateId);
       const singleItemOffers = [...offers.filter(o => o.items.length == 1)];
       const avgPriceOfItemInFleaMarket = this.getAvgPriceOfOffers(singleItemOffers);
-      const avgItemPrice = this.normalizeStandardPriceWithOffersAverage(fleaItemPrice, avgPriceOfItemInFleaMarket);
-      const finalItemPrice = this.applyMultiplierForItemPrice(templateId, avgItemPrice);
+      fleaItemPrice = this.normalizeStandardPriceWithOffersAverage(fleaItemPrice, avgPriceOfItemInFleaMarket);
+      fleaItemPrice = this.applyMultiplierForItemPrice(templateId, fleaItemPrice);
       parsedOffers.push({
         templateId,
-        price: Math.floor(finalItemPrice)
+        price: Math.floor(fleaItemPrice)
       });
 
     }
@@ -308,13 +308,11 @@ class Mod implements IPreSptLoadMod, IPostDBLoadMod {
     this.logger.debug(`Current prices from players for [${templateId}]: Avg: ${avgPriceOfItemInFleaMarket}`);
     fleaPriceForItem = this.normalizeStandardPriceWithOffersAverage(fleaPriceForItem, avgPriceOfItemInFleaMarket);
     fleaPriceForItem = this.applyMultiplierForItemPrice(templateId, fleaPriceForItem);
-
-
     return fleaPriceForItem;
   }
 
   private applyMultiplierForItemPrice(templateId: string, price: number): number {
-    const itemPriceModifer = this.ragfairConfig.dynamic.itemPriceMultiplier[templateId];
+    const itemPriceModifer = this.ragfairConfig.dynamic.itemPriceMultiplier[templateId] ?? 1;
     return price * itemPriceModifer;
   }
 
