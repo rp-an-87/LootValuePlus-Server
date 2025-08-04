@@ -202,8 +202,8 @@ class Mod implements IPreSptLoadMod, IPostDBLoadMod {
       let fleaItemPrice = this.priceService.getFleaPriceForItem(_id);
       const offersForItem = [...(offersByTemplate.get(_id) || [])]
       const singleItemOffers = [...offersForItem.filter(o => o.items.length == 1)];
-      const avgPriceOfItemInFleaMarket = this.getAvgPriceOfOffers(singleItemOffers);
 
+      const avgPriceOfItemInFleaMarket = this.getAvgPriceOfOffers(singleItemOffers);
       if (avgPriceOfItemInFleaMarket > 0) {
         fleaItemPrice = this.normalizeStandardPriceWithOffersAverage(fleaItemPrice, avgPriceOfItemInFleaMarket);
       }
@@ -223,7 +223,7 @@ class Mod implements IPreSptLoadMod, IPostDBLoadMod {
     // This offers a layer of security, there is some weird interaction if you use LiveFleaPrices where it will update the price of an item but the flea market will retain weird prices
     // Maybe the offers are generated before the price of the object is updated with the live flea? Who knows
     // In case there is such a desync, the offer will be automatically lowered to the avg price, randomly changing to anywhere between -10% and +10% of the avg
-    if (fleaItemPrice > avgPriceOfItemInFleaMarket * 1.1) {
+    if (fleaItemPrice > avgPriceOfItemInFleaMarket) {
       const randomMultiplier = Math.floor(Math.random() * (1.1 - 0.9 + 1) + 0.9);
       return avgPriceOfItemInFleaMarket * randomMultiplier;
     }
@@ -233,6 +233,7 @@ class Mod implements IPreSptLoadMod, IPostDBLoadMod {
 
 
   private getAvgPriceOfOffers(singleItemOffers: IRagfairOffer[]) {
+    if (singleItemOffers.length === 0) return 0;
     const offerPrices = [...singleItemOffers.map(o => o.summaryCost)];
     const min = Math.min(...offerPrices);
     const max = Math.max(...offerPrices);
