@@ -20,6 +20,7 @@ import { IRagfairConfig } from "@spt/models/spt/config/IRagfairConfig";
 import { ConfigServer } from "@spt/servers/ConfigServer";
 import { DatabaseServer } from "@spt/servers/DatabaseServer";
 import { RagfairPriceService } from "@spt/services/RagfairPriceService";
+import { ItemType } from "@spt/models/eft/common/tables/ITemplateItem";
 
 class Mod implements IPreSptLoadMod, IPostDBLoadMod {
   private itemHelper: ItemHelper;
@@ -194,16 +195,22 @@ class Mod implements IPreSptLoadMod, IPostDBLoadMod {
 
     const parsedOffers: { templateId: string, price: number }[] = [];
     const offersByTemplate = this.getAllUserOffersByTemplateId();
+    const items = this.itemHelper.getItems().filter(i => i._props.CanSellOnRagfair && i._type != ItemType.NODE);
 
-    for (const [templateId, offers] of offersByTemplate.entries()) {
+    for (const { _id } of items) {
 
-      let fleaItemPrice = this.priceService.getFleaPriceForItem(templateId);
-      const singleItemOffers = [...offers.filter(o => o.items.length == 1)];
+      let fleaItemPrice = this.priceService.getFleaPriceForItem(_id);
+      const offersForItem = [...(offersByTemplate.get(_id) || [])]
+      const singleItemOffers = [...offersForItem.filter(o => o.items.length == 1)];
       const avgPriceOfItemInFleaMarket = this.getAvgPriceOfOffers(singleItemOffers);
-      fleaItemPrice = this.normalizeStandardPriceWithOffersAverage(fleaItemPrice, avgPriceOfItemInFleaMarket);
-      fleaItemPrice = this.applyMultiplierForItemPrice(templateId, fleaItemPrice);
+
+      if (avgPriceOfItemInFleaMarket > 0) {
+        fleaItemPrice = this.normalizeStandardPriceWithOffersAverage(fleaItemPrice, avgPriceOfItemInFleaMarket);
+      }
+
+      fleaItemPrice = this.applyMultiplierForItemPrice(_id, fleaItemPrice);
       parsedOffers.push({
-        templateId,
+        templateId: _id,
         price: Math.floor(fleaItemPrice)
       });
 
