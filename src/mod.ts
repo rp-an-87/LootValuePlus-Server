@@ -13,6 +13,7 @@ import type { ILogger } from "@spt/models/spt/utils/ILogger";
 import type { StaticRouterModService } from "@spt/services/mod/staticRouter/StaticRouterModService";
 
 import { IExit } from "@spt/models/eft/common/ILocationBase";
+import { ItemType } from "@spt/models/eft/common/tables/ITemplateItem";
 import { ConfigTypes } from "@spt/models/enums/ConfigTypes";
 import { MemberCategory } from "@spt/models/enums/MemberCategory";
 import { IPostDBLoadMod } from "@spt/models/external/IPostDBLoadMod";
@@ -20,7 +21,8 @@ import { IRagfairConfig } from "@spt/models/spt/config/IRagfairConfig";
 import { ConfigServer } from "@spt/servers/ConfigServer";
 import { DatabaseServer } from "@spt/servers/DatabaseServer";
 import { RagfairPriceService } from "@spt/services/RagfairPriceService";
-import { ItemType } from "@spt/models/eft/common/tables/ITemplateItem";
+
+import modConfig from "../config/config.json";
 
 class Mod implements IPreSptLoadMod, IPostDBLoadMod {
   private itemHelper: ItemHelper;
@@ -32,7 +34,7 @@ class Mod implements IPreSptLoadMod, IPostDBLoadMod {
   private ragfairConfig: IRagfairConfig;
 
   private logger: ILogger;
-  private modConfig = require("../config/config.json")
+  
 
   public preSptLoad(container: DependencyContainer): void {
     const logger = container.resolve<ILogger>("WinstonLogger");
@@ -51,7 +53,7 @@ class Mod implements IPreSptLoadMod, IPostDBLoadMod {
     this.ragfairConfig = config.getConfig(ConfigTypes.RAGFAIR);
 
 
-    if (this.modConfig.flea?.disableBarters === true) {
+    if (modConfig.flea?.disableBarters === true) {
       this.ragfairConfig.dynamic.barter.chancePercent = 0;
       this.logger.info("[LootValuePlus]: Removed player barter offers from flea market");
     }
@@ -122,8 +124,8 @@ class Mod implements IPreSptLoadMod, IPostDBLoadMod {
   public postDBLoad(container: DependencyContainer): void {
 
     const locations = container.resolve<DatabaseServer>("DatabaseServer").getTables().locations;
-    const shouldModifyChances = this.modConfig.extracts?.chances?.enabled === true;
-    const shouldModifyCoops = this.modConfig.extracts?.coop?.enabled === true;
+    const shouldModifyChances = modConfig.extracts?.chances?.enabled === true;
+    const shouldModifyCoops = modConfig.extracts?.coop?.enabled === true;
 
     if (shouldModifyChances || shouldModifyCoops) {
       this.logger.info("");
@@ -136,7 +138,7 @@ class Mod implements IPreSptLoadMod, IPostDBLoadMod {
       this.logger.info("[LootValuePlus]: Modifying variable extraction chances");
 
       const increaseChanceOfExit = (location: string, exit: IExit) => {
-        const chance = this.modConfig.extracts.chances.locations[location];
+        const chance = modConfig.extracts.chances.locations[location];
         const currentChance = exit.Chance;
 
         if (chance !== currentChance) {
@@ -147,7 +149,7 @@ class Mod implements IPreSptLoadMod, IPostDBLoadMod {
 
       Object
         .keys(locations)
-        .filter(location => this.modConfig?.extracts?.chances?.locations[location] != undefined)
+        .filter(location => modConfig?.extracts?.chances?.locations[location] != undefined)
         .filter(location => locations[location].base?.exits != undefined)
         .map(location => {
           return {
@@ -169,7 +171,7 @@ class Mod implements IPreSptLoadMod, IPostDBLoadMod {
         exit.PassageRequirement = "TransferItem";
         exit.RequirementTip = "EXFIL_Item";
         exit.Id = "569668774bdc2da2298b4568";
-        exit.Count = this.modConfig?.extracts?.coop?.amount ?? 1000;
+        exit.Count = modConfig?.extracts?.coop?.amount ?? 1000;
         this.logger.info(`[LootValuePlus]: Changed map '${location}' coop exit '${exit.Name}' to be paid by ${exit.Count} euros`);
       };
 
@@ -186,6 +188,62 @@ class Mod implements IPreSptLoadMod, IPostDBLoadMod {
       this.logger.info("");
       this.logger.info("[LootValuePlus]: ======= End modification of extractions...");
       this.logger.info("");
+    }
+
+
+    const locationServices = container.resolve<DatabaseServer>("DatabaseServer").getTables().templates?.locationServices;
+    const changeBtrChances = modConfig?.btr?.enabled;
+    if (changeBtrChances === true) {
+
+      this.logger.info("");
+      this.logger.info("[LootValuePlus]: ======= Beginning modification of BTR behaviour...");
+
+      for (const location in modConfig.btr.locations) {
+        const btrLocationCfg = locationServices.BTRServerSettings?.ServerMapBTRSettings[location];
+        const desiredCfg = modConfig.btr.locations[location];
+
+        const originalChance = btrLocationCfg?.ChanceSpawn;
+        const desiredChance = desiredCfg.chance;
+        if (originalChance != desiredChance) {
+          console.log(`[LootValuePlus]: Changed BTR spawn chance in ${location} from ${originalChance} to ${desiredChance}`);
+          locationServices.BTRServerSettings.ServerMapBTRSettings[location].ChanceSpawn = desiredChance;
+        }
+
+        const originalPauseDurationMin = btrLocationCfg?.PauseDurationRange.x;
+        const desiredPauseDurationMin = desiredCfg.stopDuration.min;
+        if(originalPauseDurationMin != desiredPauseDurationMin) {
+          console.log(`[LootValuePlus]: Changed BTR minimum waiting time in ${location} from ${originalPauseDurationMin} to ${desiredPauseDurationMin}`);
+          locationServices.BTRServerSettings.ServerMapBTRSettings[location].PauseDurationRange.x = desiredPauseDurationMin;
+        }
+        
+        const originalPauseDurationMax = btrLocationCfg?.PauseDurationRange.y;
+        const desiredPauseDurationMax = desiredCfg.stopDuration.max;
+        if(originalPauseDurationMax != desiredPauseDurationMax) {
+          console.log(`[LootValuePlus]: Changed BTR maximum waiting time in ${location} from ${originalPauseDurationMax} to ${originalPauseDurationMax}`);
+          locationServices.BTRServerSettings.ServerMapBTRSettings[location].PauseDurationRange.y = desiredPauseDurationMax;
+        }
+        
+        const originalSpawnPeriodMin = btrLocationCfg?.SpawnPeriod.y;
+        const desiredSpawnPeriodMin = desiredCfg.spawnTime.min;
+        if(originalSpawnPeriodMin != desiredSpawnPeriodMin) {
+          console.log(`[LootValuePlus]: Changed BTR spawn mininum time in ${location} from ${originalSpawnPeriodMin} to ${desiredSpawnPeriodMin}`);
+          locationServices.BTRServerSettings.ServerMapBTRSettings[location].SpawnPeriod.x = desiredSpawnPeriodMin;
+        }
+        
+        const originalSpawnPeriodMax = btrLocationCfg?.SpawnPeriod.y;
+        const desiredSpawnPeriodMax = desiredCfg.spawnTime.max;
+        if(originalSpawnPeriodMax != desiredSpawnPeriodMax) {
+          console.log(`[LootValuePlus]: Changed BTR spawn maximum time in ${location} from ${originalSpawnPeriodMax} to ${desiredSpawnPeriodMax}`);
+          locationServices.BTRServerSettings.ServerMapBTRSettings[location].SpawnPeriod.y = desiredSpawnPeriodMax;
+        }
+
+
+      }
+
+      this.logger.info("[LootValuePlus]: ======= End modification of BTR behaviour...");
+      this.logger.info("");
+
+
     }
 
   }

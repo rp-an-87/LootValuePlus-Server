@@ -19,5 +19,32 @@
             "enabled": true,
             "amount": 3000
         }
+    },
+    "btr": {
+        "enabled": true,
+        "locations": {
+            "Woods": {
+                "chance": 100,
+                "stopDuration": {
+                    "min": 90.0,
+                    "max": 150.0
+                },
+                "spawnTime": {
+                    "min": 60.0,
+                    "max": 180.0
+                }
+            },
+            "TarkovStreets": {
+                "chance": 100,
+                "stopDuration": {
+                    "min": 90.0,
+                    "max": 150.0
+                },
+                "spawnTime": {
+                    "min": 60.0,
+                    "max": 180.0
+                }
+            }
+        }
     }
 }
