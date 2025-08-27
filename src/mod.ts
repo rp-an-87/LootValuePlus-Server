@@ -34,7 +34,7 @@ class Mod implements IPreSptLoadMod, IPostDBLoadMod {
   private ragfairConfig: IRagfairConfig;
 
   private logger: ILogger;
-  
+
 
   public preSptLoad(container: DependencyContainer): void {
     const logger = container.resolve<ILogger>("WinstonLogger");
@@ -211,28 +211,28 @@ class Mod implements IPreSptLoadMod, IPostDBLoadMod {
 
         const originalPauseDurationMin = btrLocationCfg?.PauseDurationRange.x;
         const desiredPauseDurationMin = desiredCfg.stopDuration.min;
-        if(originalPauseDurationMin != desiredPauseDurationMin) {
+        if (originalPauseDurationMin != desiredPauseDurationMin) {
           console.log(`[LootValuePlus]: Changed BTR minimum waiting time in ${location} from ${originalPauseDurationMin} to ${desiredPauseDurationMin}`);
           locationServices.BTRServerSettings.ServerMapBTRSettings[location].PauseDurationRange.x = desiredPauseDurationMin;
         }
-        
+
         const originalPauseDurationMax = btrLocationCfg?.PauseDurationRange.y;
         const desiredPauseDurationMax = desiredCfg.stopDuration.max;
-        if(originalPauseDurationMax != desiredPauseDurationMax) {
+        if (originalPauseDurationMax != desiredPauseDurationMax) {
           console.log(`[LootValuePlus]: Changed BTR maximum waiting time in ${location} from ${originalPauseDurationMax} to ${originalPauseDurationMax}`);
           locationServices.BTRServerSettings.ServerMapBTRSettings[location].PauseDurationRange.y = desiredPauseDurationMax;
         }
-        
+
         const originalSpawnPeriodMin = btrLocationCfg?.SpawnPeriod.y;
         const desiredSpawnPeriodMin = desiredCfg.spawnTime.min;
-        if(originalSpawnPeriodMin != desiredSpawnPeriodMin) {
+        if (originalSpawnPeriodMin != desiredSpawnPeriodMin) {
           console.log(`[LootValuePlus]: Changed BTR spawn mininum time in ${location} from ${originalSpawnPeriodMin} to ${desiredSpawnPeriodMin}`);
           locationServices.BTRServerSettings.ServerMapBTRSettings[location].SpawnPeriod.x = desiredSpawnPeriodMin;
         }
-        
+
         const originalSpawnPeriodMax = btrLocationCfg?.SpawnPeriod.y;
         const desiredSpawnPeriodMax = desiredCfg.spawnTime.max;
-        if(originalSpawnPeriodMax != desiredSpawnPeriodMax) {
+        if (originalSpawnPeriodMax != desiredSpawnPeriodMax) {
           console.log(`[LootValuePlus]: Changed BTR spawn maximum time in ${location} from ${originalSpawnPeriodMax} to ${desiredSpawnPeriodMax}`);
           locationServices.BTRServerSettings.ServerMapBTRSettings[location].SpawnPeriod.y = desiredSpawnPeriodMax;
         }
@@ -250,6 +250,8 @@ class Mod implements IPreSptLoadMod, IPostDBLoadMod {
 
 
   private getAllItemsSellingFleaPrice(): { templateId: string, price: number }[] {
+    this.priceService.refreshDynamicPrices();
+    this.priceService.refreshStaticPrices();
 
     const parsedOffers: { templateId: string, price: number }[] = [];
     const offersByTemplate = this.getAllUserOffersByTemplateId();
@@ -258,15 +260,17 @@ class Mod implements IPreSptLoadMod, IPostDBLoadMod {
     for (const { _id } of items) {
 
       let fleaItemPrice = this.priceService.getFleaPriceForItem(_id);
-      const offersForItem = [...(offersByTemplate.get(_id) || [])]
-      const singleItemOffers = [...offersForItem.filter(o => o.items.length == 1)];
-
-      const avgPriceOfItemInFleaMarket = this.getAvgPriceOfOffers(singleItemOffers);
+      const offersForItem = [...(offersByTemplate.get(_id) || [])];
+      const avgPriceOfItemInFleaMarket = this.getAvgPriceOfOffers(offersForItem);
       if (avgPriceOfItemInFleaMarket > 0) {
         fleaItemPrice = this.normalizeStandardPriceWithOffersAverage(fleaItemPrice, avgPriceOfItemInFleaMarket);
       }
 
       fleaItemPrice = this.applyMultiplierForItemPrice(_id, fleaItemPrice);
+      if (fleaItemPrice == 0) {
+        this.logger.warning(`Flea price '0' for item ${_id}! (Avg: ${avgPriceOfItemInFleaMarket})`);
+      }
+
       parsedOffers.push({
         templateId: _id,
         price: Math.floor(fleaItemPrice)
@@ -277,12 +281,20 @@ class Mod implements IPreSptLoadMod, IPostDBLoadMod {
     return parsedOffers;
   }
 
+  /*
+    This offers a layer of security, there is some weird interaction if you use LiveFleaPrices where it will update the price of an item but the flea market will retain weird prices
+    Maybe the offers are generated before the price of the object is updated with the live flea? Who knows
+    In case there is such a desync, the offer will be automatically lowered to the avg price, randomly changing to anywhere between -10% and +10% of the avg
+  */
   private normalizeStandardPriceWithOffersAverage(fleaItemPrice: number, avgPriceOfItemInFleaMarket: number): number {
-    // This offers a layer of security, there is some weird interaction if you use LiveFleaPrices where it will update the price of an item but the flea market will retain weird prices
-    // Maybe the offers are generated before the price of the object is updated with the live flea? Who knows
-    // In case there is such a desync, the offer will be automatically lowered to the avg price, randomly changing to anywhere between -10% and +10% of the avg
-    if (fleaItemPrice > avgPriceOfItemInFleaMarket) {
-      const randomMultiplier = Math.floor(Math.random() * (1.1 - 0.9 + 1) + 0.9);
+    if (avgPriceOfItemInFleaMarket <= 0) {
+      return fleaItemPrice;
+    }
+
+    // Calculate percentage difference
+    const diffPercent = Math.abs(fleaItemPrice - avgPriceOfItemInFleaMarket) / avgPriceOfItemInFleaMarket;
+    if (diffPercent > 0.1) {
+      const randomMultiplier = Math.random() * (1.1 - 0.9) + 0.9;
       return avgPriceOfItemInFleaMarket * randomMultiplier;
     }
 
@@ -290,13 +302,21 @@ class Mod implements IPreSptLoadMod, IPostDBLoadMod {
   }
 
 
-  private getAvgPriceOfOffers(singleItemOffers: IRagfairOffer[]) {
-    if (singleItemOffers.length === 0) return 0;
-    const offerPrices = [...singleItemOffers.map(o => o.summaryCost)];
-    const min = Math.min(...offerPrices);
-    const max = Math.max(...offerPrices);
-    const avg = (max + min) / 2;
-    return avg;
+  private getAvgPriceOfOffers(offers: IRagfairOffer[]) {
+    if (offers.length === 0)
+      return 0;
+
+    const offerPrices = offers.map(o => {
+      if (o.sellInOnePiece) {
+        return o.summaryCost / o.quantity;
+      } else {
+        return o.summaryCost;
+      }
+    });
+
+    const sum = offerPrices.reduce((runningTotal, currentPrice) => runningTotal + currentPrice, 0);
+    const mean = sum / offerPrices.length;
+    return mean;
   }
 
   private getAllUserOffersByTemplateId(): Map<string, IRagfairOffer[]> {
