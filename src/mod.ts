@@ -13,7 +13,7 @@ import type { ILogger } from "@spt/models/spt/utils/ILogger";
 import type { StaticRouterModService } from "@spt/services/mod/staticRouter/StaticRouterModService";
 
 import { IExit } from "@spt/models/eft/common/ILocationBase";
-import { ItemType } from "@spt/models/eft/common/tables/ITemplateItem";
+import { IGridFilter, ITemplateItem, ItemType } from "@spt/models/eft/common/tables/ITemplateItem";
 import { ConfigTypes } from "@spt/models/enums/ConfigTypes";
 import { MemberCategory } from "@spt/models/enums/MemberCategory";
 import { IPostDBLoadMod } from "@spt/models/external/IPostDBLoadMod";
@@ -23,6 +23,7 @@ import { DatabaseServer } from "@spt/servers/DatabaseServer";
 import { RagfairPriceService } from "@spt/services/RagfairPriceService";
 
 import modConfig from "../config/config.json";
+import { config } from "process";
 
 class Mod implements IPreSptLoadMod, IPostDBLoadMod {
   private itemHelper: ItemHelper;
@@ -244,7 +245,113 @@ class Mod implements IPreSptLoadMod, IPostDBLoadMod {
       this.logger.info("");
 
 
+      const misc = modConfig?.misc;
+      this.logger.info("[LootValuePlus]: ======= Start misc modifications...");
+
+      if (misc.removeFragmentationChanceFromBullets == true) {
+        const itemRecords = container.resolve<DatabaseServer>("DatabaseServer").getTables().templates?.items;
+        const items: ITemplateItem[] = Object.values(itemRecords);
+        const ammoItems = items.filter(i => i._parent == "5485a8684bdc2da71d8b4567");
+        let counter = 0;
+        ammoItems.forEach(i => {
+          if (i._props?.FragmentationChance > 0.0) {
+            i._props.FragmentationChance = 0.0;
+            counter++;
+          }
+        });
+
+        this.logger.info(`[LootValuePlus]: Set the FragmentationChance of ${counter} templates to '0.0'.`);
+      }
+
+      this.logger.info("[LootValuePlus]: ======= End misc modifications...");
+      this.logger.info("");
+
     }
+
+
+    const containerCfg = modConfig?.containers;
+    this.logger.info("[LootValuePlus]: ======= Start container modifications...");
+    const modifyThiccItemCase = containerCfg.allowItems?.thiccItemCase === true;
+    const modifyItemCase = containerCfg.allowItems?.itemCase === true;
+
+    if (modifyThiccItemCase || modifyItemCase) {
+
+      interface ModifyItem {
+        id: string, grid: string, item: ITemplateItem, filters: string[]
+      }
+
+      const itemCase = {
+        id: "59fb042886f7746c5005a7b2",
+        grid: "59fb042886f7746c5005a7b3",
+        item: null,
+        filters: null
+      } as ModifyItem;
+
+      const thiccItemCase = {
+        id: "5c0a840b86f7742ffa4f2482",
+        grid: "5c0a840b86f7742ffa4f2484",
+        item: null,
+        filters: null
+      } as ModifyItem;
+
+
+      const itemRecords = container.resolve<DatabaseServer>("DatabaseServer").getTables().templates?.items;
+
+      // item case
+      const itemCaseItem = itemRecords[itemCase.id];
+      itemCase.item = itemCaseItem;
+      itemCase.filters = itemCaseItem._props?.Grids[0]?._props?.filters[0]?.Filter ?? [];
+
+      // thic item case
+      const thiccItemCaseItem = itemRecords[thiccItemCase.id];
+      thiccItemCase.item = thiccItemCaseItem;
+      thiccItemCase.filters = thiccItemCaseItem._props?.Grids[0]?._props?.filters[0]?.Filter ?? [];
+
+      const itemCfg = containerCfg.allowItems?.items;
+      if (itemCfg.secureContainers === true) {
+        const SECURE_CONTAINERS_NODE_ID = "5448bf274bdc2dfc2f8b456a";
+        if (modifyThiccItemCase) {
+          thiccItemCase.filters.push(SECURE_CONTAINERS_NODE_ID);
+          this.logger.info("[LootValuePlus]: Allowed [secure containers] in [THICC Item Case]");
+        }
+        if (modifyItemCase) {
+          itemCase.filters.push(SECURE_CONTAINERS_NODE_ID);
+          this.logger.info("[LootValuePlus]: Allowed [secure containers] in [Item Case]");
+        }
+      }
+
+      if (itemCfg.ammoBoxes === true) {
+        const AMMO_BOXES_NODE_ID = "543be5cb4bdc2deb348b4568";
+        if (modifyThiccItemCase) {
+          thiccItemCase.filters.push(AMMO_BOXES_NODE_ID);
+          this.logger.info("[LootValuePlus]: Allowed [ammo boxes] in [THICC Item Case]");
+        }
+        if (modifyItemCase) {
+          itemCase.filters.push(AMMO_BOXES_NODE_ID);
+          this.logger.info("[LootValuePlus]: Allowed [ammo boxes] in [Item Case]");
+        }
+      }
+
+      if (itemCfg.specials === true) {
+        const RADIO_TRANSMITTERS_NODE_ID = "62e9103049c018f425059f38";
+        const SPECIAL_ITEM_NODE_ID = "54009119af1c881c07000029";
+        const MARK_NODE_ID = "65ddcc7aef36f6413d0829b9";
+        const PLANTING_KITS_NODE_ID = "6672e40ebb23210ae87d39eb";
+        if (modifyThiccItemCase) {
+          thiccItemCase.filters.push(...[RADIO_TRANSMITTERS_NODE_ID, SPECIAL_ITEM_NODE_ID, MARK_NODE_ID, PLANTING_KITS_NODE_ID]);
+          this.logger.info("[LootValuePlus]: Allowed [misc special items] in [THICC Item Case]");
+        }
+        if (modifyItemCase) {
+          itemCase.filters.push(...[RADIO_TRANSMITTERS_NODE_ID, SPECIAL_ITEM_NODE_ID, MARK_NODE_ID, PLANTING_KITS_NODE_ID]);
+          this.logger.info("[LootValuePlus]: Allowed [misc special items] in [Item Case]");
+        }
+
+      }
+
+    }
+
+    this.logger.info("[LootValuePlus]: ======= End container modifications...");
+    this.logger.info("");
 
   }
 

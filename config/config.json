@@ -46,5 +46,19 @@
                 }
             }
         }
+    },
+    "containers": {
+        "allowItems": {
+            "thiccItemCase": true,
+            "itemCase": true,
+            "items": {
+                "secureContainers": true,
+                "ammoBoxes": true,
+                "specials": true
+            }
+        }
+    },
+    "misc": {
+        "removeFragmentationChanceFromBullets": false
     }
 }
