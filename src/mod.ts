@@ -368,6 +368,11 @@ class Mod implements IPreSptLoadMod, IPostDBLoadMod {
 
       let fleaItemPrice = this.priceService.getFleaPriceForItem(_id);
       const offersForItem = [...(offersByTemplate.get(_id) || [])];
+
+      if(!offersForItem.length) {
+        this.logger.warning(`Item ${_id} has no offers, price: ${fleaItemPrice}`);
+      }
+
       const avgPriceOfItemInFleaMarket = this.getAvgPriceOfOffers(offersForItem);
       if (avgPriceOfItemInFleaMarket > 0) {
         fleaItemPrice = this.normalizeStandardPriceWithOffersAverage(fleaItemPrice, avgPriceOfItemInFleaMarket);
