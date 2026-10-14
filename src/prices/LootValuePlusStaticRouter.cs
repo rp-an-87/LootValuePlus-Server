@@ -32,17 +32,17 @@ public class LootValuePlusStaticRouter : StaticRouter
         [
             new RouteAction(
                 "/LootValue/GetAllItemSellingFleaPrice",
-                async (url, request, sessionId, output) => await _getAllPricesHandler.Handle()
+                async (url, request, sessionId, _, _) => await _getAllPricesHandler.Handle()
             ),
             new RouteAction(
                 "/LootValue/GetMultipleItemsSellingFleaPrice",
-                async (url, request, sessionId, output) => await _getMultiplePricesHandler.Handle(request),
+                async (url, request, sessionId, _, _) => await _getMultiplePricesHandler.Handle(request),
 
                 typeof(GetMultiplePricesRequestData)
             ),
             new RouteAction(
                 "/LootValue/GetItemLowestFleaPrice",
-                async (url, request, sessionId, output) => await _getSingleItemPriceHandler.Handle(request),
+                async (url, request, sessionId, _, _) => await _getSingleItemPriceHandler.Handle(request),
                 typeof(GetSinglePriceRequestData)
             ),
         ];

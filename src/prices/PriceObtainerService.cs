@@ -2,8 +2,7 @@ using SPTarkov.DI.Annotations;
 using SPTarkov.Server.Core.Models.Eft.Ragfair;
 using SPTarkov.Server.Core.Models.Enums;
 using SPTarkov.Server.Core.Models.Spt.Config;
-using SPTarkov.Server.Core.Servers;
-using SPTarkov.Server.Core.Services;
+using SPTarkov.Server.Core.Services.Ragfair;
 
 namespace LootValuePlus;
 
@@ -16,10 +15,11 @@ public class PriceObtainerService
 
     public PriceObtainerService(
         RagfairPriceService ragfairPriceService,
-        ConfigServer configServer)
+        RagfairConfig ragfairConfig
+    )
     {
         _ragfairPriceService = ragfairPriceService;
-        _ragfairConfig = configServer.GetConfig<RagfairConfig>();
+        _ragfairConfig = ragfairConfig;
     }
 
     public double? GetNormalizedFleaPriceForItem(IEnumerable<RagfairOffer> offers, string templateId)

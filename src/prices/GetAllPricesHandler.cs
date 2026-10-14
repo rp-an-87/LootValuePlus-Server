@@ -1,15 +1,12 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using SPTarkov.Common.Models.Logging;
 using SPTarkov.DI.Annotations;
-using SPTarkov.Server.Core.Helpers;
-using SPTarkov.Server.Core.Models.Common;
+using SPTarkov.Server.Core.Helpers.Items;
 using SPTarkov.Server.Core.Models.Eft.Ragfair;
 using SPTarkov.Server.Core.Models.Enums;
-using SPTarkov.Server.Core.Models.Spt.Config;
-using SPTarkov.Server.Core.Models.Utils;
-using SPTarkov.Server.Core.Servers;
-using SPTarkov.Server.Core.Services;
-using SPTarkov.Server.Core.Utils;
+using SPTarkov.Server.Core.Models.Spt.Tables;
+using SPTarkov.Server.Core.Services.Ragfair;
 
 namespace LootValuePlus;
 
@@ -19,19 +16,19 @@ public class GetAllPricesHandler
     private readonly RagfairOfferService _ragfairOfferService;
     private readonly PriceObtainerService _priceObtainerService;
     private readonly ISptLogger<GetAllPricesHandler> _logger;
-    private readonly DatabaseService _databaseService;
+    private readonly TemplateTable _templateTable;
     private readonly ItemHelper _itemHelper;
 
     public GetAllPricesHandler(
         RagfairOfferService ragfairOfferService,
         PriceObtainerService priceObtainerService,
         ISptLogger<GetAllPricesHandler> logger,
-        DatabaseService databaseService,
+        TemplateTable templateTable,
         ItemHelper itemHelper)
     {
         _ragfairOfferService = ragfairOfferService;
         _priceObtainerService = priceObtainerService;
-        _databaseService = databaseService;
+        _templateTable = templateTable;
         _logger = logger;
         _itemHelper = itemHelper;
     }
@@ -41,7 +38,7 @@ public class GetAllPricesHandler
 
         var responseOffers = new List<ParsedOffer>();
         var offersByTemplate = GetAllUserOffersByTemplateId();
-        var items = _databaseService.GetItems().Values.Where(i => i.Properties?.CanSellOnRagfair == true && i.Type != "Node");
+        var items = _templateTable.Items.Values.Where(i => i.Properties?.CanSellOnRagfair == true && i.Type != "Node");
 
         foreach (var item in items)
         {
