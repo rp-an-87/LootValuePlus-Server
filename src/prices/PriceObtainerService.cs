@@ -1,8 +1,7 @@
 using SPTarkov.DI.Annotations;
+using SPTarkov.Server.Core.Controllers;
 using SPTarkov.Server.Core.Models.Eft.Ragfair;
-using SPTarkov.Server.Core.Models.Enums;
 using SPTarkov.Server.Core.Models.Spt.Config;
-using SPTarkov.Server.Core.Services.Ragfair;
 
 namespace LootValuePlus;
 
@@ -10,27 +9,27 @@ namespace LootValuePlus;
 public class PriceObtainerService
 {
 
-    private readonly RagfairPriceService _ragfairPriceService;
+    private readonly RagfairController _ragfairController;
     private readonly RagfairConfig _ragfairConfig;
 
     public PriceObtainerService(
-        RagfairPriceService ragfairPriceService,
+        RagfairController ragfairController,
         RagfairConfig ragfairConfig
     )
     {
-        _ragfairPriceService = ragfairPriceService;
+        _ragfairController = ragfairController;
         _ragfairConfig = ragfairConfig;
     }
 
-    public double? GetNormalizedFleaPriceForItem(IEnumerable<RagfairOffer> offers, string templateId)
+    /// <summary>
+    /// Returns the exact average price SPT itself compares a player's offer against when rolling for a sale
+    /// (see RagfairController.AddPlayerOffer), so listing at this price gives the max sell chance.
+    /// </summary>
+    public double GetAverageFleaPriceForItem(string templateId)
     {
-        var offersByPlayers = offers.Where(o => o.User?.MemberType != MemberCategory.Trader);
-        var fleaPriceForItem = _ragfairPriceService.GetFleaPriceForItem(templateId);
-        var avgPriceOfItemInFleaMarket = Utils.GetAvgPriceOfOffers(offersByPlayers);
-        fleaPriceForItem = Utils.NormalizeStandardPriceWithOffersAverage(fleaPriceForItem, avgPriceOfItemInFleaMarket);
+        var averages = _ragfairController.GetItemMinAvgMaxFleaPriceValues(new GetMarketPriceRequestData { TemplateId = templateId });
         var multiplier = Utils.GetPriceMultiplierForItem(_ragfairConfig, templateId);
-        fleaPriceForItem *= multiplier;
-        return fleaPriceForItem;
+        return (averages.Avg ?? 0) * multiplier;
     }
 
 }

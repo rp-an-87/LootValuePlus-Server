@@ -3,7 +3,6 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using SPTarkov.DI.Annotations;
 using SPTarkov.Server.Core.Models.Utils;
-using SPTarkov.Server.Core.Services.Ragfair;
 using static LootValuePlus.LootValuePlusStaticRouter;
 
 namespace LootValuePlus;
@@ -13,14 +12,11 @@ public class GetMultiplePricesHandler
 {
 
     private readonly PriceObtainerService _priceObtainerService;
-    private readonly RagfairOfferService _ragfairOfferService;
 
     public GetMultiplePricesHandler(
-        PriceObtainerService priceObtainerService,
-        RagfairOfferService ragfairOfferService)
+        PriceObtainerService priceObtainerService)
     {
         this._priceObtainerService = priceObtainerService;
-        this._ragfairOfferService = ragfairOfferService;
     }
 
 
@@ -31,8 +27,7 @@ public class GetMultiplePricesHandler
         var parsedPrices = new List<ParsedPrice>();
         foreach (var templateId in templateIdsToLookup)
         {
-            var offers = _ragfairOfferService.GetOffersOfType(templateId) ?? [];
-            var price = _priceObtainerService.GetNormalizedFleaPriceForItem(offers, templateId) ?? 0;
+            var price = _priceObtainerService.GetAverageFleaPriceForItem(templateId);
             var parsedPrice = new ParsedPrice(templateId, Math.Floor(price));
             parsedPrices.Add(parsedPrice);
         }
